@@ -12,23 +12,31 @@ current_date = pd.to_datetime(date_str, format='%Y%m%d')
 formatted_date = f"{current_date.month}/{current_date.day}/{str(current_date.year)[-2:]}"
 print(formatted_date)
 
-file_path = f'S:/Audrey/Audrey/AAT.DCF/{date_str}/Status_Final_{date_str}.xlsx'
+file_path = f'S:/Audrey/Audrey/AAT.DCF/{date_str}/ECF_Status_Final_{date_str}.xlsx'
+aat_data_path = f'S:/Audrey/Audrey/AAT.DCF/{date_str}/AAT_{date_str}.xlsx'
 aat_pm_owner_path = f's:/Audrey/Audrey/AAT.DCF/AAT PM Owner.xlsx'
 output_folder = f'S:/Audrey/Audrey/AAT.DCF/{date_str}'
 output_filename = f'AAT vs ECF {date_str}.xlsx'
 output_path = os.path.join(output_folder, output_filename)
 os.makedirs(output_folder, exist_ok=True)
 
-df = pd.read_excel(file_path)
+df_aat = pd.read_excel(aat_data_path)
+df_b = pd.read_excel(file_path)
+
+df = pd. merge(df_aat,df_b,on = "Deal Name",how = "left")
+df.to_excel(output_path, index=False)
+
 
 df[f'{formatted_date} MV'] = df[f'{formatted_date} MV'].copy()
 
 df.drop(columns=['Instrument','Abs IRR Change'], inplace=True)
 df.drop_duplicates(subset='Deal Name', keep='first', inplace=True)
 
-df.insert(df.columns.get_loc('IRR DCF Base') + 1, 'AAT&DCF IRR Diffs', df[f'{formatted_date} IRR'] - df['IRR DCF Base'])
-df.insert(df.columns.get_loc('Duration DCF Base¹') + 1, 'Duration Diffs', df['Duration Base¹'] - df['Duration DCF Base¹'])
-df.insert(df.columns.get_loc('Deal Owner') + 1, 'AAT PM Owner', df['Deal Owner'].map(pd.read_excel(aat_pm_owner_path, index_col='Deal Owner')['PM Owner']))
+df.insert(df.columns.get_loc(f'{formatted_date} IRR') + 1, 'AAT&DCF IRR Diffs', df[f'{formatted_date} IRR'] - df[f'{formatted_date} AAT IRR'])
+df.insert(df.columns.get_loc('Duration DCF Base¹') + 1, 'Duration Diffs', df['Duration DCF Base¹'] - df['Duration AAT Base¹'])
+
+pm_map = pd.read_excel(aat_pm_owner_path).set_index('Sr. Portfolio Manager')['AAT PM Owner']
+df.insert(df.columns.get_loc('Sr. Portfolio Manager') + 1, 'AAT PM Owner', df['Sr. Portfolio Manager'].map(pm_map))
 
 liq_cap_col_idx = df.columns.get_loc('Liq Cap')
 market_value_col_idx = df.columns.get_loc(f'{formatted_date} MV')
@@ -46,7 +54,7 @@ df['Cumulative MV %'] = df[f'{formatted_date} MV'].cumsum() / total_MV * 100
 df['Cumulative MV %'] = df['Cumulative MV %'].apply(lambda x: f"{x:.2f}%" if pd.notnull(x) else "")
 
 
-df.rename(columns={'IRR Change': 'MoM IRR Movements', 'Duration Base¹': 'Duration AAT Base', 'Duration DCF BaseDuration DCF Base¹': 'Duration DCF Base¹'}, inplace=True)
+df.rename(columns={'IRR Change': 'MoM IRR Movements', 'Duration AAT Base¹': 'Duration AAT', 'Duration DCF Base¹': 'Duration DCF'}, inplace=True)
 df.to_excel(output_path, index=False)
 
 
