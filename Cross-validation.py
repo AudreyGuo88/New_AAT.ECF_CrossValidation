@@ -5,12 +5,15 @@ from openpyxl import load_workbook
 from openpyxl.styles import PatternFill, Font, Alignment
 from openpyxl.formatting.rule import CellIsRule
 from openpyxl.worksheet.dimensions import RowDimension
+from streamlit import columns
 
-
-date_str = '20250331'
+date_str = '20250430'
 current_date = pd.to_datetime(date_str, format='%Y%m%d')
+# Calculate the last date as one month before the current date
+last_date = current_date - pd.offsets.MonthEnd(1)
 formatted_date = f"{current_date.month}/{current_date.day}/{str(current_date.year)[-2:]}"
-print(formatted_date)
+formatted_last_date = f"{last_date.month}/{last_date.day}/{str(last_date.year)[-2:]}"
+print(formatted_date,formatted_last_date)
 
 file_path = f'S:/Audrey/Audrey/AAT.DCF/{date_str}/ECF_Status_Final_{date_str}.xlsx'
 aat_data_path = f'S:/Audrey/Audrey/AAT.DCF/{date_str}/AAT_{date_str}.xlsx'
@@ -27,13 +30,13 @@ df = pd. merge(df_aat,df_b,on = "Deal Name",how = "left")
 df.to_excel(output_path, index=False)
 
 
-df[f'{formatted_date} MV'] = df[f'{formatted_date} MV'].copy()
+df= df.copy()
 
 df.drop(columns=['Instrument','Abs IRR Change'], inplace=True)
 df.drop_duplicates(subset='Deal Name', keep='first', inplace=True)
 
-df.insert(df.columns.get_loc(f'{formatted_date} IRR') + 1, 'AAT&DCF IRR Diffs', df[f'{formatted_date} IRR'] - df[f'{formatted_date} AAT IRR'])
-df.insert(df.columns.get_loc('Duration DCF Base¹') + 1, 'Duration Diffs', df['Duration DCF Base¹'] - df['Duration AAT Base¹'])
+df.insert(df.columns.get_loc(f'{formatted_date} IRR') + 1, 'AAT&ECF IRR Diffs', df[f'{formatted_date} IRR'] - df[f'{formatted_date} AAT IRR'])
+df.insert(df.columns.get_loc('Duration DCF Base¹') + 1, 'Duration Diffs', df['Duration DCF Base¹'] - df['Duration AAT Base'])
 
 pm_map = pd.read_excel(aat_pm_owner_path).set_index('Sr. Portfolio Manager')['AAT PM Owner']
 df.insert(df.columns.get_loc('Sr. Portfolio Manager') + 1, 'AAT PM Owner', df['Sr. Portfolio Manager'].map(pm_map))
@@ -54,7 +57,17 @@ df['Cumulative MV %'] = df[f'{formatted_date} MV'].cumsum() / total_MV * 100
 df['Cumulative MV %'] = df['Cumulative MV %'].apply(lambda x: f"{x:.2f}%" if pd.notnull(x) else "")
 
 
-df.rename(columns={'IRR Change': 'MoM IRR Movements', 'Duration AAT Base¹': 'Duration AAT', 'Duration DCF Base¹': 'Duration DCF'}, inplace=True)
+df.rename(columns={f'{formatted_date} IRR': f'{formatted_date} ECF IRR', f'{formatted_last_date} IRR': f'{formatted_last_date} ECF IRR','IRR Change': 'MoM ECF IRR Movements', 'Duration AAT Base': 'Duration AAT', 'Duration DCF Base¹': 'Duration ECF', 'Comments': 'AAT Comments'}, inplace=True)
+# Reorder columns
+columns_order = [
+    'Deal Name', 'Sr. Portfolio Manager', 'AAT PM Owner', f'{formatted_date} AAT IRR',
+    f'{formatted_date} ECF IRR', 'AAT&ECF IRR Diffs', f'{formatted_last_date} ECF IRR', 'MoM ECF IRR Movements',
+    'Duration AAT', 'Duration ECF', 'Duration Diffs', 'Liq Cap',
+    f'{formatted_date} MV', 'MV %', 'Cumulative MV %', 'AAT Comments'
+]
+
+df = df[columns_order]
+
 df.to_excel(output_path, index=False)
 
 
@@ -90,8 +103,8 @@ def highlight_and_collect(ws, column_name, threshold, fill, market_value_thresho
                         significant_rows.append(row_values)
     return significant_rows
 
-significant_changes = highlight_and_collect(ws, 'MoM IRR Movements', 0.05, highlight_fill_yellow)
-significant_diffs = highlight_and_collect(ws, 'AAT&DCF IRR Diffs', 0.05, highlight_fill_orange)
+significant_changes = highlight_and_collect(ws, 'MoM ECF IRR Movements', 0.05, highlight_fill_yellow)
+significant_diffs = highlight_and_collect(ws, 'AAT&ECF IRR Diffs', 0.05, highlight_fill_orange)
 highlight_durations = highlight_and_collect(ws, 'Duration Diffs', 0.5, highlight_fill_green)
 
 
@@ -104,13 +117,13 @@ df_significant_diffs = pd.DataFrame(significant_diffs, columns=header)
 df_highlight_durations = pd.DataFrame(highlight_durations, columns=header)
 
 with pd.ExcelWriter(output_path, engine='openpyxl', mode='a', if_sheet_exists='replace') as writer:
-    df_significant_changes.to_excel(writer, sheet_name='Significant AAT IRR Movers', index=False)
-    df_significant_diffs.to_excel(writer, sheet_name='Significant AAT&DCF Diffs', index=False)
+    df_significant_changes.to_excel(writer, sheet_name='Significant ECF IRR Movers', index=False)
+    df_significant_diffs.to_excel(writer, sheet_name='Significant AAT&ECF Diffs', index=False)
     df_highlight_durations.to_excel(writer, sheet_name='Highlight Duration Diffs', index=False)
 
 # Load the sheets into DataFrames
-df_significant_changes = pd.read_excel(output_path, sheet_name='Significant AAT IRR Movers')
-df_significant_diffs = pd.read_excel(output_path, sheet_name='Significant AAT&DCF Diffs')
+df_significant_changes = pd.read_excel(output_path, sheet_name='Significant ECF IRR Movers')
+df_significant_diffs = pd.read_excel(output_path, sheet_name='Significant AAT&ECF Diffs')
 
 
 wb = load_workbook(output_path)
@@ -132,7 +145,7 @@ ws.cell(row=1, column=ws.max_column, value='Category')
 
 irr_diff_col_idx = None
 for col in ws. iter_cols(1, ws.max_column):
-    if col[0].value == 'AAT&DCF IRR Diffs':
+    if col[0].value == 'AAT&ECF IRR Diffs':
         irr_diff_col_idx = col[0].column
         break
 
@@ -230,6 +243,8 @@ for row in range(2, ws.max_row + 1):
     else:
         ws.row_dimensions[row].outlineLevel = 1
         ws.row_dimensions[row].hidden = True
+
+
 
 wb.save(output_path)
 wb.close()
