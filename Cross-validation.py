@@ -5,7 +5,8 @@ from openpyxl import load_workbook
 from openpyxl.styles import PatternFill, Font, Alignment
 from openpyxl.formatting.rule import CellIsRule
 from openpyxl.worksheet.dimensions import RowDimension
-from streamlit import columns
+from utils import get_column_index, format_header_cell, format_all_sheets
+
 
 date_str = '20250430'
 current_date = pd.to_datetime(date_str, format='%Y%m%d')
@@ -23,61 +24,65 @@ output_filename = f'AAT vs ECF {date_str}.xlsx'
 output_path = os.path.join(output_folder, output_filename)
 os.makedirs(output_folder, exist_ok=True)
 
-df_aat = pd.read_excel(aat_data_path)
-df_b = pd.read_excel(file_path)
+# === Global Cell Styles ===
+HEADER_FONT = Font(bold=True, color='FFFFFF')
+HEADER_FILL = PatternFill(start_color='00008B', end_color='00008B', fill_type='solid')
+ALIGN_CENTER = Alignment(horizontal='center', vertical='center')
 
-df = pd. merge(df_aat,df_b,on = "Deal Name",how = "left")
-df.to_excel(output_path, index=False)
-
-
-df= df.copy()
-
-df.drop(columns=['Instrument','Abs IRR Change'], inplace=True)
-df.drop_duplicates(subset='Deal Name', keep='first', inplace=True)
-
-df.insert(df.columns.get_loc(f'{formatted_date} IRR') + 1, 'AAT&ECF IRR Diffs', df[f'{formatted_date} IRR'] - df[f'{formatted_date} AAT IRR'])
-df.insert(df.columns.get_loc('Duration DCF Base¹') + 1, 'Duration Diffs', df['Duration DCF Base¹'] - df['Duration AAT Base'])
-
-pm_map = pd.read_excel(aat_pm_owner_path).set_index('Sr. Portfolio Manager')['AAT PM Owner']
-df.insert(df.columns.get_loc('Sr. Portfolio Manager') + 1, 'AAT PM Owner', df['Sr. Portfolio Manager'].map(pm_map))
-
-liq_cap_col_idx = df.columns.get_loc('Liq Cap')
-market_value_col_idx = df.columns.get_loc(f'{formatted_date} MV')
-df_liq_cap = df.pop('Liq Cap')
-df_market_value = df.pop(f'{formatted_date} MV')
-df.insert(df.columns.get_loc('Duration Diffs') + 1, 'Liq Cap', df_liq_cap)
-df.insert(df.columns.get_loc('Liq Cap') + 1, f'{formatted_date} MV', df_market_value)
+def load_data():
+    df_aat = pd.read_excel(aat_data_path)
+    df_b = pd.read_excel(file_path)
+    return pd.merge(df_aat, df_b, on = 'Deal Name', how = 'left')
 
 
-total_MV = df[f'{formatted_date} MV'].sum()
-df['MV %'] = df[f'{formatted_date} MV'] / total_MV * 100
-df['MV %'] = df['MV %'].apply(lambda x: f"{x:.2f}%" if pd.notnull(x) else "")
-df.sort_values(by=f'{formatted_date} MV', ascending=False, inplace=True)
-df['Cumulative MV %'] = df[f'{formatted_date} MV'].cumsum() / total_MV * 100
-df['Cumulative MV %'] = df['Cumulative MV %'].apply(lambda x: f"{x:.2f}%" if pd.notnull(x) else "")
+def process_data(df):
 
+    df.drop(columns=['Instrument','Abs IRR Change'], inplace=True)
+    df.drop_duplicates(subset='Deal Name', keep='first', inplace=True)
 
-df.rename(columns={f'{formatted_date} IRR': f'{formatted_date} ECF IRR', f'{formatted_last_date} IRR': f'{formatted_last_date} ECF IRR','IRR Change': 'MoM ECF IRR Movements', 'Duration AAT Base': 'Duration AAT', 'Duration DCF Base¹': 'Duration ECF', 'Comments': 'AAT Comments'}, inplace=True)
-# Reorder columns
-columns_order = [
-    'Deal Name', 'Sr. Portfolio Manager', 'AAT PM Owner', f'{formatted_date} AAT IRR',
-    f'{formatted_date} ECF IRR', 'AAT&ECF IRR Diffs', f'{formatted_last_date} ECF IRR', 'MoM ECF IRR Movements',
-    'Duration AAT', 'Duration ECF', 'Duration Diffs', 'Liq Cap',
-    f'{formatted_date} MV', 'MV %', 'Cumulative MV %', 'AAT Comments'
-]
+    df.insert(df.columns.get_loc(f'{formatted_date} IRR') + 1, 'AAT&ECF IRR Diffs', df[f'{formatted_date} IRR'] - df[f'{formatted_date} AAT IRR'])
+    df.insert(df.columns.get_loc('Duration DCF Base¹') + 1, 'Duration Diffs', df['Duration DCF Base¹'] - df['Duration AAT Base'])
 
-df = df[columns_order]
+    pm_map = pd.read_excel(aat_pm_owner_path).set_index('Sr. Portfolio Manager')['AAT PM Owner']
+    df.insert(df.columns.get_loc('Sr. Portfolio Manager') + 1, 'AAT PM Owner', df['Sr. Portfolio Manager'].map(pm_map))
 
-df.to_excel(output_path, index=False)
+    liq_cap_col_idx = df.columns.get_loc('Liq Cap')
+    market_value_col_idx = df.columns.get_loc(f'{formatted_date} MV')
+    df_liq_cap = df.pop('Liq Cap')
+    df_market_value = df.pop(f'{formatted_date} MV')
+    df.insert(df.columns.get_loc('Duration Diffs') + 1, 'Liq Cap', df_liq_cap)
+    df.insert(df.columns.get_loc('Liq Cap') + 1, f'{formatted_date} MV', df_market_value)
 
+    df.rename(columns={f'{formatted_date} IRR': f'{formatted_date} ECF IRR',
+                       f'{formatted_last_date} IRR': f'{formatted_last_date} ECF IRR',
+                       'IRR Change': 'MoM ECF IRR Movements',
+                       'Duration AAT Base': 'Duration AAT', 'Duration DCF Base¹': 'Duration ECF',
+                       'Comments': 'AAT Comments'}, inplace=True)
 
-wb = load_workbook(output_path)
-ws = wb.active
+    return df
 
-# Define the fills for highlighting
-highlight_fill_yellow = PatternFill(start_color="FFFF00", end_color="FFFF00", fill_type="solid")
-highlight_fill_orange = PatternFill(start_color="FFA500", end_color="FFA500", fill_type="solid")
-highlight_fill_green = PatternFill(start_color="00FF00", end_color="00FF00", fill_type="solid")
+def reorder_columns(df):
+
+    columns_order = [
+        'Deal Name', 'Sr. Portfolio Manager', 'AAT PM Owner', f'{formatted_date} AAT IRR',
+        f'{formatted_date} ECF IRR', 'AAT&ECF IRR Diffs', f'{formatted_last_date} ECF IRR','MoM ECF IRR Movements',
+        'Duration AAT', 'Duration ECF', 'Duration Diffs','Liq Cap',
+        f'{formatted_date} MV', 'MV %', 'AAT Comments'
+    ]
+    return df[columns_order]
+
+def calculate_metrics(df):
+    total_MV = df[f'{formatted_date} MV'].sum()
+    df['MV %'] = df[f'{formatted_date} MV'] / total_MV * 100
+    df['MV %'] = df['MV %'].apply(lambda x: f"{x:.2f}%" if pd.notnull(x) else "")
+    df.sort_values(by=f'{formatted_date} MV', ascending=False, inplace=True)
+    df['Cumulative MV %'] = df[f'{formatted_date} MV'].cumsum() / total_MV * 100
+    df['Cumulative MV %'] = df['Cumulative MV %'].apply(lambda x: f"{x:.2f}%" if pd.notnull(x) else "")
+    return df
+
+def save_to_excel(df, output_path):
+    with pd.ExcelWriter(output_path, engine = 'openpyxl') as writer:
+         df.to_excel(writer, index=False, sheet_name='Summary')
 
 
 def highlight_and_collect(ws, column_name, threshold, fill, market_value_threshold=25000000):
@@ -103,148 +108,154 @@ def highlight_and_collect(ws, column_name, threshold, fill, market_value_thresho
                         significant_rows.append(row_values)
     return significant_rows
 
-significant_changes = highlight_and_collect(ws, 'MoM ECF IRR Movements', 0.05, highlight_fill_yellow)
-significant_diffs = highlight_and_collect(ws, 'AAT&ECF IRR Diffs', 0.05, highlight_fill_orange)
-highlight_durations = highlight_and_collect(ws, 'Duration Diffs', 0.5, highlight_fill_green)
+def significant_changes_and_diffs(ws):
+    # Define the fills for highlighting
+    highlight_fill_yellow = PatternFill(start_color="FFFF00", end_color="FFFF00", fill_type="solid")
+    highlight_fill_orange = PatternFill(start_color="FFA500", end_color="FFA500", fill_type="solid")
+    highlight_fill_green = PatternFill(start_color="00FF00", end_color="00FF00", fill_type="solid")
 
+    # Highlight significant changes and collect rows
+    significant_changes = highlight_and_collect(ws, 'MoM ECF IRR Movements', 0.05, highlight_fill_yellow)
+    significant_diffs = highlight_and_collect(ws, 'AAT&ECF IRR Diffs', 0.05, highlight_fill_orange)
+    highlight_durations = highlight_and_collect(ws, 'Duration Diffs', 0.5, highlight_fill_green)
 
-wb.save(output_path)
-
-# Convert significant changes and diffs to DataFrames and save to new sheets
-header = [cell.value for cell in ws[1]]
-df_significant_changes = pd.DataFrame(significant_changes, columns=header)
-df_significant_diffs = pd.DataFrame(significant_diffs, columns=header)
-df_highlight_durations = pd.DataFrame(highlight_durations, columns=header)
-
-with pd.ExcelWriter(output_path, engine='openpyxl', mode='a', if_sheet_exists='replace') as writer:
-    df_significant_changes.to_excel(writer, sheet_name='Significant ECF IRR Movers', index=False)
-    df_significant_diffs.to_excel(writer, sheet_name='Significant AAT&ECF Diffs', index=False)
-    df_highlight_durations.to_excel(writer, sheet_name='Highlight Duration Diffs', index=False)
-
-# Load the sheets into DataFrames
-df_significant_changes = pd.read_excel(output_path, sheet_name='Significant ECF IRR Movers')
-df_significant_diffs = pd.read_excel(output_path, sheet_name='Significant AAT&ECF Diffs')
-
-
-wb = load_workbook(output_path)
-
-# Define the formats
-header_font = Font(bold=True, color='FFFFFF')
-header_fill = PatternFill(start_color='00008B', end_color='00008B', fill_type='solid')
-alignment_center = Alignment(horizontal='center', vertical='center')
+    return significant_changes, significant_diffs, highlight_durations
 
 
 
-ws = wb['Sheet1']
-ws.title = 'Summary'
+def format_worksheet(ws):
+    for col in ws.iter_cols():
+        header = col[0].value
+        if header and 'IRR' in header:
+            for cell in col[1:]:
+                cell.number_format = '0.00%'
+        elif header in [f'{formatted_date} MV', 'Liq Cap']:
+            for cell in col[1:]:
+                cell.number_format = '#,##0_);(#,##0)'
+        elif header and 'Duration' in header:
+            for cell in col[1:]:
+                cell.number_format = '0.00'
+
+    for col in ws.columns:
+        max_length = max(len(str(cell.value)) for cell in col if cell.value is not None)
+        ws.column_dimensions[col[0].column_letter].width = max_length + 2
+
+    for row in ws.iter_rows(min_row=2, max_row=ws.max_row):
+        for cell in row:
+            cell.alignment = ALIGN_CENTER
+
+    for cell in ws[1]:
+        format_header_cell(cell)
 
 
-ws.insert_cols(ws.max_column + 1)
-ws.cell(row=1, column=ws.max_column, value='Category')
+def create_highlighted_sheets(wb, significant_changes, significant_diffs, highlight_durations):
+    header = [cell.value for cell in wb['Summary'][1]]
+
+    def create_sheet(name, rows):
+        ws = wb.create_sheet(title=name)
+        ws.append(header)
+        for row in rows:
+            ws.append(row)
+        return ws
+
+    ws1 = create_sheet('Significant ECF IRR Movers', significant_changes)
+    ws2 = create_sheet('Significant AAT&ECF Diffs', significant_diffs)
+    ws3 = create_sheet('Highlight Duration Diffs', highlight_durations)
+
+    format_all_sheets(ws1, ws2, ws3)
 
 
-irr_diff_col_idx = None
-for col in ws. iter_cols(1, ws.max_column):
-    if col[0].value == 'AAT&ECF IRR Diffs':
-        irr_diff_col_idx = col[0].column
-        break
+def summary_category(wb):
+    ws = wb['Summary']
 
+    mv_pct_col_idx = get_column_index(ws, 'MV %')
+    category_col_idx = mv_pct_col_idx + 1
+    ws.insert_cols(category_col_idx)
 
-if irr_diff_col_idx is not None:
-    mv_col_idx = None
-    for col in ws.iter_cols(1, ws.max_column):
-        if col[0].value == f'{formatted_date} MV':
-            mv_col_idx = col[0].column
-            break
+    cell = ws.cell(row=1, column=category_col_idx, value='Category')
+    format_header_cell(cell)
 
-    if mv_col_idx is None:
-        raise KeyError(f"'{formatted_date} MV' column not found")
+    irr_diff_col_idx = get_column_index(ws, 'AAT&ECF IRR Diffs')
+    mv_col_idx = get_column_index(ws, f'{formatted_date} MV')
 
     for row in range(2, ws.max_row + 1):
         irr_diff = ws.cell(row=row, column=irr_diff_col_idx).value
         mv_value = ws.cell(row=row, column=mv_col_idx).value
-        if mv_value > 25000000:
-            ws.cell(row=row, column=ws.max_column, value='Significant Discrepancy' if abs(irr_diff) > 0.05 else 'Alignment')
+
+        if irr_diff is not None:
+            if mv_value is not None and mv_value > 25_000_000:
+                value = 'Significant Discrepancy' if abs(irr_diff) > 0.05 else 'Alignment'
+            else:
+                value = 'Significant discrepancy but ignore' if abs(irr_diff) > 0.05 else 'Alignment'
+            ws.cell(row=row, column=category_col_idx, value=value)
+
+
+def drop_cumulative_mv_column(wb):
+    # Drop "Cumulative MV%" column from all sheets except "Summary"
+    for ws in wb.worksheets:
+        if ws.title != 'Summary':
+            for col in ws.iter_cols(1, ws.max_column):
+                if col[0].value == 'Cumulative MV %':
+                    ws.delete_cols(col[0].column)
+                    break
+
+
+
+def highlight_summary(ws):
+    # Define the fill for highlighting
+    highlight_fill = PatternFill(start_color="D3D3D3", end_color="D3D3D3", fill_type="solid")
+    deal_name_col_idx = None
+    mv_col_idx = None
+    for col in ws.iter_cols(1, ws.max_column):
+        if col[0].value == 'Deal Name':
+            deal_name_col_idx = col[0].column
+        if col[0].value == f'{formatted_date} MV':
+            mv_col_idx = col[0].column
+        if deal_name_col_idx and mv_col_idx:
+            break
+
+    if deal_name_col_idx is None or mv_col_idx is None:
+        raise KeyError(f"'Deal Name' or '{formatted_date} MV' column not found")
+
+    # Iterate over rows and apply fill conditionally based on the MV value
+    for row in range(2, ws.max_row + 1):
+        mv_value = ws.cell(row=row, column=mv_col_idx).value
+        deal_name_cell = ws.cell(row=row, column=deal_name_col_idx)
+
+        # Apply highlight if MV > 25,000,000, otherwise group and hide the row
+        if mv_value is not None and mv_value > 25000000:
+            deal_name_cell.fill = highlight_fill
         else:
-            ws.cell(row=row, column=ws.max_column, value='Significant discrepancy but ignore' if abs(irr_diff) > 0.05 else 'Alignment')
-
-# Drop "Cumulative MV%" column from all sheets except "Summary"
-for ws in wb.worksheets:
-    if ws.title != 'Summary':
-        for col in ws.iter_cols(1, ws.max_column):
-            if col[0].value == 'Cumulative MV %':
-                ws.delete_cols(col[0].column)
-                break
+            ws.row_dimensions[row].outlineLevel = 1
+            ws.row_dimensions[row].hidden = True
+    return ws
 
 
-# Reorder the sheets by putting "Common Significant" sheet in the 2nd position
-sheet_names = wb.sheetnames
-wb._sheets = [wb[name] for name in sheet_names]
 
-def format_worksheet(ws):
-    for col in ws.iter_cols():
-        if 'IRR' in col[0].value:
-            for cell in col[1:]:
-                cell.number_format = '0.00%'
-        if col[0].value in [f'{formatted_date} MV', 'Liq Cap']:
-            for cell in col[1:]:
-                cell.number_format = '#,##0_);(#,##0)'
-        if 'Duration' in col[0].value:
-            for cell in col[1:]:
-                cell.number_format = '0.00'
-    for col in ws.columns:
-        max_length = max(len(str(cell.value)) for cell in col if cell.value is not None)
-        ws.column_dimensions[col[0].column_letter].width = max_length + 2
-    for row in ws.iter_rows(min_row=2, max_row=ws.max_row, min_col=1, max_col=ws.max_column):
-        for cell in row:
-            cell.alignment = alignment_center
-    for cell in ws[1]:
-        cell.font = header_font
-        cell.fill = header_fill
+def main():
+    df = load_data()
+    df = process_data(df)
+    df = calculate_metrics(df)
+    df = reorder_columns(df)
+    save_to_excel(df, output_path)
 
-for ws in wb.worksheets:
+    wb = load_workbook(output_path)
+    ws = wb['Summary']
+
     format_worksheet(ws)
 
+    significant_changes, significant_diffs, highlight_durations = significant_changes_and_diffs(ws)
+    create_highlighted_sheets(wb, significant_changes, significant_diffs, highlight_durations)
 
-#formatting to all worksheets
-wb.save(output_path)
-wb.close()
+    summary_category(wb)
+    highlight_summary(ws)
+    drop_cumulative_mv_column(wb)
 
-print("Data processing and formatting completed successfully.")
+    wb.save(output_path)
+    wb.close()
+    print("✅ Data processing and formatting completed successfully.")
 
+if __name__ == "__main__":
+    main()
+    print("Data processing and formatting completed successfully.")
 
-wb = load_workbook(output_path)
-ws = wb['Summary']
-
-highlight_fill = PatternFill(start_color="D3D3D3", end_color="D3D3D3", fill_type="solid")
-
-# Find the column index for ‘Deal Name' and '{formatted_date} MV'
-deal_name_col_idx = None
-mv_col_idx = None
-for col in ws.iter_cols(1, ws.max_column):
-    if col[0].value == 'Deal Name':
-        deal_name_col_idx = col[0].column
-    if col[0].value == f'{formatted_date} MV':
-        mv_col_idx = col[0].column
-    if deal_name_col_idx and mv_col_idx:
-        break
-
-if deal_name_col_idx is None or mv_col_idx is None:
-    raise KeyError(f"'Deal Name' or '{formatted_date} MV' column not found")
-
-# Iterate over rows and apply fill conditionally based on the MV value
-for row in range(2, ws.max_row + 1):
-    mv_value = ws.cell(row=row, column=mv_col_idx).value
-    deal_name_cell = ws.cell(row=row, column=deal_name_col_idx)
-
-    # Apply highlight if MV > 25,000,000, otherwise group and hide the row
-    if mv_value is not None and mv_value > 25000000:
-        deal_name_cell.fill = highlight_fill
-    else:
-        ws.row_dimensions[row].outlineLevel = 1
-        ws.row_dimensions[row].hidden = True
-
-
-
-wb.save(output_path)
-wb.close()
