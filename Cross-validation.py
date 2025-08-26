@@ -8,7 +8,7 @@ from openpyxl.worksheet.dimensions import RowDimension
 from utils import get_column_index, format_header_cell, format_all_sheets
 
 
-date_str = '20250430'
+date_str = '20250630'
 current_date = pd.to_datetime(date_str, format='%Y%m%d')
 # Calculate the last date as one month before the current date
 last_date = current_date - pd.offsets.MonthEnd(1)
@@ -16,7 +16,7 @@ formatted_date = f"{current_date.month}/{current_date.day}/{str(current_date.yea
 formatted_last_date = f"{last_date.month}/{last_date.day}/{str(last_date.year)[-2:]}"
 print(formatted_date,formatted_last_date)
 
-file_path = f'S:/Audrey/Audrey/AAT.DCF/{date_str}/ECF_Status_Final_{date_str}.xlsx'
+file_path = f'S:/Audrey/Audrey/AAT.DCF/{date_str}/Status_Final_{date_str}.xlsx'
 aat_data_path = f'S:/Audrey/Audrey/AAT.DCF/{date_str}/AAT_{date_str}.xlsx'
 aat_pm_owner_path = f's:/Audrey/Audrey/AAT.DCF/AAT PM Owner.xlsx'
 output_folder = f'S:/Audrey/Audrey/AAT.DCF/{date_str}'
