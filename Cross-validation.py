@@ -1,14 +1,19 @@
+from gc import DEBUG_LEAK
 
 import pandas as pd
 import os
+
+from matplotlib.patheffects import withSimplePatchShadow
 from openpyxl import load_workbook
 from openpyxl.styles import PatternFill, Font, Alignment
 from openpyxl.formatting.rule import CellIsRule
 from openpyxl.worksheet.dimensions import RowDimension
+from sympy import andre
+from sympy.utilities.exceptions import ignore_warnings
 from utils import get_column_index, format_header_cell, format_all_sheets
+from watchdog.events import PatternMatchingEventHandler
 
-
-date_str = '20250630'
+date_str = '20250731'
 current_date = pd.to_datetime(date_str, format='%Y%m%d')
 # Calculate the last date as one month before the current date
 last_date = current_date - pd.offsets.MonthEnd(1)
@@ -17,7 +22,8 @@ formatted_last_date = f"{last_date.month}/{last_date.day}/{str(last_date.year)[-
 print(formatted_date,formatted_last_date)
 
 file_path = f'S:/Audrey/Audrey/AAT.DCF/{date_str}/Status_Final_{date_str}.xlsx'
-aat_data_path = f'S:/Audrey/Audrey/AAT.DCF/{date_str}/AAT_{date_str}.xlsx'
+# aat_data_path = f'S:/Audrey/Audrey/AAT.DCF/{date_str}/AAT_{date_str}.xlsx'
+aat_data_path = f'//evprodfsg01/QR_Workspace/AssetAllocation/CFValidation/Prod/AATOutput/{date_str}/AATOutput.{date_str}.xlsx'
 aat_pm_owner_path = f's:/Audrey/Audrey/AAT.DCF/AAT PM Owner.xlsx'
 output_folder = f'S:/Audrey/Audrey/AAT.DCF/{date_str}'
 output_filename = f'AAT vs ECF {date_str}.xlsx'
@@ -120,7 +126,6 @@ def significant_changes_and_diffs(ws):
     highlight_durations = highlight_and_collect(ws, 'Duration Diffs', 0.5, highlight_fill_green)
 
     return significant_changes, significant_diffs, highlight_durations
-
 
 
 def format_worksheet(ws):
