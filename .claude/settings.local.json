@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(\"S:\\\\Audrey\\\\Audrey\\\\Github\\\\New_AAT.ECF_CrossValidation\\\\README.md\" << 'EOF'\n# AAT.ECF Cross-Validation Project\n\nThis project processes and validates AAT \\(Asset Allocation Tool\\) and ECF \\(Enterprise Cash Flow\\) data.\n\n## Project Structure\n\n```\nNew_AAT.ECF_CrossValidation/\n├── main.py                    # Main entry point\n├── config.py                  # Configuration file\n├── utils.py                   # Utility functions\n├── modules/\n│   ├── __init__.py\n│   ├── cross_validation.py   # Cross-validation report module\n│   └── [future modules]\n├── Cross-validation.py        # Legacy script \\(keep for reference\\)\n└── README.md                  # This file\n```\n\n## Quick Start\n\n### Run All Modules\n\n```bash\npython main.py\n```\n\n### Run Specific Modules\n\n**Method 1: Using config.py**\nEdit `config.py` and set the desired flags:\n```python\nENABLE_CROSS_VALIDATION = True  # Enable\n# ENABLE_MODULE2 = False         # Disable\n```\n\n**Method 2: Comment/Uncomment in main.py**\nOpen `main.py` and comment out the modules you don't want to run.\n\n## Configuration\n\nEdit `config.py` to change:\n- **Date**: `DATE_STR = '20251130'`\n- **Paths**: `BASE_PATH`, `AAT_OUTPUT_BASE_PATH`\n- **Thresholds**: `SIGNIFICANT_MV_THRESHOLD`, `IRR_DIFF_THRESHOLD`, etc.\n\n## Modules\n\n### 1. Cross-Validation Report\nGenerates AAT vs ECF comparison reports with highlighting and categorization.\n\n## Adding New Modules\n\n1. Create `modules/new_module.py`\n2. Add `ENABLE_NEW_MODULE = True` to `config.py`\n3. Add module call to `main.py`\n\n## Requirements\n\n- Python 3.8+\n- pandas\n- openpyxl\nEOF)",
+      "Bash(python main.py:*)"
+    ]
+  }
+}
