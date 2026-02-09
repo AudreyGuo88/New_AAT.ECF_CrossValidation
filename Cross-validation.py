@@ -345,8 +345,24 @@ def format_worksheet(ws: Worksheet, current_date: str) -> None:
         format_header_cell(cell)
 
 
+def remove_columns_from_sheet(ws: Worksheet, columns_to_remove: List[str]) -> None:
+    """
+    Remove specified columns from a worksheet.
+
+    Args:
+        ws: Worksheet to process
+        columns_to_remove: List of column names to remove
+    """
+    # Iterate in reverse order to avoid index shifting issues
+    for col_idx in range(ws.max_column, 0, -1):
+        header_value = ws.cell(row=1, column=col_idx).value
+        if header_value in columns_to_remove:
+            ws.delete_cols(col_idx)
+
+
 def create_highlighted_sheets(wb: Workbook, significant_changes: List,
-                              significant_diffs: List, duration_diffs: List) -> None:
+                              significant_diffs: List, duration_diffs: List,
+                              current_date: str, last_date: str) -> None:
     """
     Create separate sheets for different types of significant items.
 
@@ -355,6 +371,8 @@ def create_highlighted_sheets(wb: Workbook, significant_changes: List,
         significant_changes: Rows with significant IRR changes
         significant_diffs: Rows with significant AAT/ECF differences
         duration_diffs: Rows with significant duration differences
+        current_date: Formatted current date string
+        last_date: Formatted previous date string
     """
     header = [cell.value for cell in wb['Summary'][1]]
 
@@ -366,16 +384,36 @@ def create_highlighted_sheets(wb: Workbook, significant_changes: List,
             ws.append(row)
         return ws
 
+    # Create sheets
     ws_changes = create_sheet('Significant ECF IRR Movers', significant_changes)
-    ws_diffs = create_sheet('Significant AAT&ECF Diffs', significant_diffs)
+    ws_diffs = create_sheet('Highlight IRR Diffs', significant_diffs)
     ws_durations = create_sheet('Highlight Duration Diffs', duration_diffs)
+
+    # Remove columns from Highlight IRR Diffs sheet
+    irr_diffs_columns_to_remove = [
+        f'{last_date} ECF IRR',
+        'MoM ECF IRR Movements',
+        'Duration AAT',
+        'Duration ECF',
+        'Duration Diffs'
+    ]
+    remove_columns_from_sheet(ws_diffs, irr_diffs_columns_to_remove)
+
+    # Remove all IRR-related columns from Highlight Duration Diffs sheet
+    # First, identify all column headers containing 'IRR'
+    duration_columns_to_remove = []
+    for col in ws_durations.iter_cols(1, ws_durations.max_column):
+        header = col[0].value
+        if header and 'IRR' in str(header):
+            duration_columns_to_remove.append(header)
+    remove_columns_from_sheet(ws_durations, duration_columns_to_remove)
 
     format_all_sheets(ws_changes, ws_diffs, ws_durations)
 
 
 def add_category_column(wb: Workbook, current_date: str) -> None:
     """
-    Add categorization column to summary sheet.
+    Add categorization column to summary sheet based on both IRR and Duration differences.
 
     Args:
         wb: Workbook containing summary sheet
@@ -394,18 +432,26 @@ def add_category_column(wb: Workbook, current_date: str) -> None:
 
     # Get column indices
     irr_diff_col_idx = get_column_index(ws, 'AAT&ECF IRR Diffs')
+    duration_diff_col_idx = get_column_index(ws, 'Duration Diffs')
     mv_col_idx = get_column_index(ws, f'{current_date} MV')
 
-    # Categorize each row
+    # Categorize each row based on both IRR and Duration differences
     for row in range(2, ws.max_row + 1):
         irr_diff = ws.cell(row=row, column=irr_diff_col_idx).value
+        duration_diff = ws.cell(row=row, column=duration_diff_col_idx).value
         mv_value = ws.cell(row=row, column=mv_col_idx).value
 
-        if irr_diff is not None:
+        # Check if either IRR diff or Duration diff exceeds threshold
+        has_irr_discrepancy = irr_diff is not None and abs(irr_diff) > IRR_DIFF_THRESHOLD
+        has_duration_discrepancy = duration_diff is not None and abs(duration_diff) > DURATION_DIFF_THRESHOLD
+
+        if irr_diff is not None or duration_diff is not None:
             if mv_value is not None and mv_value > SIGNIFICANT_MV_THRESHOLD:
-                category = 'Significant Discrepancy' if abs(irr_diff) > IRR_DIFF_THRESHOLD else 'Alignment'
+                # Significant MV: categorize based on whether there's any discrepancy
+                category = 'Significant Discrepancy' if (has_irr_discrepancy or has_duration_discrepancy) else 'Alignment'
             else:
-                category = 'Significant discrepancy but ignore' if abs(irr_diff) > IRR_DIFF_THRESHOLD else 'Alignment'
+                # Small MV: note discrepancy but mark as ignore
+                category = 'Significant discrepancy but ignore' if (has_irr_discrepancy or has_duration_discrepancy) else 'Alignment'
             ws.cell(row=row, column=category_col_idx, value=category)
 
 
@@ -496,7 +542,7 @@ def main() -> None:
 
         # Identify and create sheets for significant items
         sig_changes, sig_diffs, dur_diffs = identify_significant_changes(ws, current_date)
-        create_highlighted_sheets(wb, sig_changes, sig_diffs, dur_diffs)
+        create_highlighted_sheets(wb, sig_changes, sig_diffs, dur_diffs, current_date, last_date)
 
         # Add categorization and final formatting
         add_category_column(wb, current_date)
