@@ -97,6 +97,12 @@ def load_data(aat_path: str, status_path: str) -> pd.DataFrame:
     df_aat = pd.read_excel(aat_path)
     df_status = pd.read_excel(status_path)
 
+    # Filter Status_Final to only keep Deal-level rows (where Instrument is empty)
+    # This removes individual instrument rows and keeps only SUBTOTAL rows with aggregated MV
+    print(f"  - Status file before filtering: {len(df_status)} rows")
+    df_status = df_status[df_status['Instrument'].isna()]
+    print(f"  - Status file after filtering (Deal-level only): {len(df_status)} rows")
+
     return pd.merge(df_aat, df_status, on='Deal Name', how='left')
 
 
