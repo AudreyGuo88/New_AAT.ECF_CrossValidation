@@ -30,7 +30,7 @@ def main():
 
     # ===== Configuration =====
     # Set the processing date here (format: YYYYMMDD)
-    DATE_STR = '20251130'
+    DATE_STR = '20251231'
 
     print("=" * 80)
     print("AAT.ECF Cross-Validation Project")
@@ -41,9 +41,9 @@ def main():
     # ===== Run Modules =====
     # Comment out any module you don't want to run
 
-    # run_cross_validation(DATE_STR)           # Module 1: Cross-Validation Report
-    # run_copy_comments(DATE_STR)            # Module 2: Historical Validation Comments
-    run_large_deal_summary(DATE_STR)       # Module 3: Large Deal Summary for Dave
+    run_cross_validation(DATE_STR)           # Module 1: Cross-Validation Report
+    run_copy_comments(DATE_STR)              # Module 2: Historical Validation Comments
+    # run_large_deal_summary(DATE_STR)       # Module 3: Large Deal Summary for Dave
 
     print()
     print("=" * 80)

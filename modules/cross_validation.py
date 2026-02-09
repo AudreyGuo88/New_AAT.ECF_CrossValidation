@@ -8,6 +8,8 @@ from typing import List, Tuple
 import pandas as pd
 import os
 import sys
+import re
+import shutil
 from pathlib import Path
 from openpyxl import load_workbook
 from openpyxl.styles import PatternFill, Font, Alignment
@@ -579,6 +581,64 @@ def main(date_str: str) -> None:
         raise
 
 
+def find_next_version(date_str: str, versioned_folder: str) -> int:
+    """
+    Find the next version number for the given date.
+
+    Args:
+        date_str: Date string in format 'YYYYMMDD'
+        versioned_folder: Folder containing versioned files
+
+    Returns:
+        Next version number (1 if no existing versions found)
+    """
+    try:
+        all_files = [f for f in os.listdir(versioned_folder) if f.endswith('.xlsx') and not f.startswith('~$')]
+    except Exception as e:
+        print(f"  [Warning] Cannot read versioned folder {versioned_folder}: {e}")
+        return 1
+
+    # Pattern: date (8 digits) followed by .v and version number
+    pattern = rf'{date_str}\.v(\d+)'
+
+    max_version = 0
+    for filename in all_files:
+        match = re.search(pattern, filename)
+        if match:
+            version = int(match.group(1))
+            max_version = max(max_version, version)
+
+    return max_version + 1
+
+
+def save_versioned_copy(output_path: str, date_str: str, versioned_folder: str) -> None:
+    """
+    Save a versioned copy of the output file to the versioned files folder.
+
+    Args:
+        output_path: Path to the generated output file
+        date_str: Date string in format 'YYYYMMDD'
+        versioned_folder: Folder to save versioned files
+    """
+    try:
+        # Ensure versioned folder exists
+        os.makedirs(versioned_folder, exist_ok=True)
+
+        # Find next version number
+        next_version = find_next_version(date_str, versioned_folder)
+
+        # Create versioned filename
+        versioned_filename = f'AAT vs ECF {date_str}.v{next_version}.xlsx'
+        versioned_path = os.path.join(versioned_folder, versioned_filename)
+
+        # Copy file
+        shutil.copy2(output_path, versioned_path)
+        print(f"  [OK] Versioned copy saved: {versioned_filename}")
+
+    except Exception as e:
+        print(f"  [Warning] Failed to save versioned copy: {e}")
+
+
 def run_cross_validation(date_str: str) -> None:
     """
     Public interface to run the cross-validation report generation.
@@ -589,6 +649,11 @@ def run_cross_validation(date_str: str) -> None:
         date_str: Date string in format 'YYYYMMDD' (e.g., '20251130')
     """
     main(date_str)
+
+    # Save versioned copy
+    paths = get_file_paths(date_str)
+    output_path = os.path.join(paths['output_folder'], paths['output_filename'])
+    save_versioned_copy(output_path, date_str, config.VERSIONED_FILES_FOLDER)
 
 
 if __name__ == "__main__":
