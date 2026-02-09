@@ -27,8 +27,8 @@ sys.path.insert(0, str(parent_dir))
 import config
 
 # ===== Configuration =====
-# Source folder containing versioned files
-SOURCE_FOLDER = r'C:\Users\guoau\Magnetar Capital LLC\WKG - AAT - General\Project Management\AAT vs DCF'
+# Import source folder from config
+SOURCE_FOLDER = config.VERSIONED_FILES_FOLDER
 
 # Sheets to update
 TARGET_SHEETS = ['Highlight IRR Diffs', 'Highlight Duration Diffs']
@@ -337,17 +337,8 @@ def run_copy_comments(date_str: str) -> None:
 
     print(f"  - Total unique comments: {len(comments_map)}")
 
-    # Step 4: Create backup before updating
-    print("\n[4/4] Creating backup and updating target file...")
-    import shutil
-    backup_file = target_file.replace('.xlsx', '_backup.xlsx')
-    try:
-        shutil.copy2(target_file, backup_file)
-        print(f"  - Backup created: {os.path.basename(backup_file)}")
-    except Exception as e:
-        print(f"  [Warning] Could not create backup: {e}")
-
-    # Update target file
+    # Step 4: Update target file
+    print("\n[4/4] Updating target file...")
     updated_count = update_comments(target_file, comments_map, TARGET_SHEETS)
 
     print(f"\n{'=' * 80}")
