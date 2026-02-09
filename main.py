@@ -16,7 +16,7 @@ sys.path.insert(0, str(project_root))
 
 # Import modules
 from modules.cross_validation import run_cross_validation
-from modules.copy_comments import run_copy_comments
+from modules.historical_validation_comments import run_copy_comments
 from modules.large_deal_summary import run_large_deal_summary
 
 
@@ -42,7 +42,7 @@ def main():
     # Comment out any module you don't want to run
 
     # run_cross_validation(DATE_STR)           # Module 1: Cross-Validation Report
-    # run_copy_comments(DATE_STR)            # Module 2: Copy Comments from Previous Version
+    # run_copy_comments(DATE_STR)            # Module 2: Historical Validation Comments
     run_large_deal_summary(DATE_STR)       # Module 3: Large Deal Summary for Dave
 
     print()

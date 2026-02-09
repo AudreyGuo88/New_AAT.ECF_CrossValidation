@@ -10,9 +10,9 @@ New_AAT.ECF_CrossValidation/
 ├── config.py                    # Centralized configuration
 ├── modules/
 │   ├── __init__.py
-│   ├── cross_validation.py      # Module 1: Cross-validation report
-│   ├── copy_comments.py         # Module 2: Copy AAT comments
-│   └── large_deal_summary.py    # Module 3: Large deal summary for Dave
+│   ├── cross_validation.py                # Module 1: Cross-validation report
+│   ├── historical_validation_comments.py  # Module 2: Historical validation comments
+│   └── large_deal_summary.py              # Module 3: Large deal summary for Dave
 ├── Cross-validation.py          # Legacy script (deprecated)
 └── README.md                    # This file
 ```
@@ -33,7 +33,7 @@ Comment/uncomment the module lines in `main.py`:
 
 ```python
 run_cross_validation(DATE_STR)       # Module 1: Cross-Validation Report
-run_copy_comments(DATE_STR)          # Module 2: Copy Comments from Previous Version
+run_copy_comments(DATE_STR)          # Module 2: Historical Validation Comments
 run_large_deal_summary(DATE_STR)     # Module 3: Large Deal Summary for Dave
 ```
 
@@ -48,7 +48,7 @@ Or run modules independently:
 ```bash
 # Run individual modules
 python modules/cross_validation.py
-python modules/copy_comments.py
+python modules/historical_validation_comments.py
 python modules/large_deal_summary.py
 ```
 
@@ -74,9 +74,9 @@ python modules/large_deal_summary.py
 - Categorizes deals based on thresholds
 - Creates two highlight tabs: IRR Diffs and Duration Diffs
 
-### Module 2: Copy AAT Comments
+### Module 2: Historical Validation Comments
 
-**Purpose**: Automatically copy AAT Comments from previous version to current version.
+**Purpose**: Automatically copy AAT Comments from previous version to current version for historical validation.
 
 **Input**:
 - Versioned files in: `C:\Users\guoau\Magnetar Capital LLC\WKG - AAT - General\Project Management\AAT vs DCF`
@@ -169,7 +169,7 @@ pip install -r requirements.txt
    run_cross_validation(DATE_STR)
    ```
 
-2. **Copy Comments from Previous Version** (Module 2)
+2. **Historical Validation Comments** (Module 2)
    ```python
    run_copy_comments(DATE_STR)
    ```
