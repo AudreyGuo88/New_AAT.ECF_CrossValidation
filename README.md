@@ -73,6 +73,10 @@ python modules/large_deal_summary.py
 - Highlights significant discrepancies
 - Categorizes deals based on thresholds
 - Creates two highlight tabs: IRR Diffs and Duration Diffs
+- Creates **"Missing AAT Data"** tab listing deals with missing AAT IRR or Duration AAT:
+  - Columns: Deal Name, Sr. Portfolio Manager, AAT PM Owner, AAT IRR, Duration AAT, Liq Cap, MV, Missing Fields
+  - Sorted by Liq Cap descending
+  - Missing cells highlighted in red; Deal Name highlighted in gray for large deals (Liq Cap > $25mm)
 
 ### Module 2: Historical Validation Comments
 
@@ -83,13 +87,15 @@ python modules/large_deal_summary.py
 - File pattern: `AAT vs ECF {date}.v{version}.xlsx`
 
 **Output**:
-- Updates AAT Comments in latest version file
+- Updates AAT Comments in latest version file in `VERSIONED_FILES_FOLDER`
+- Saves a versioned copy to `AAT_ECF_SUMMARY_REPORT` (e.g., `AAT vs ECF 20251231.v2.xlsx`)
 
 **Logic**:
 - Finds latest version (e.g., v5)
 - Copies comments from v(n-1) (e.g., v4)
 - If current is v1, copies from last version of previous month
 - Updates two tabs: "Highlight IRR Diffs" and "Highlight Duration Diffs"
+- Auto-increments version in summary report folder (v1 for new month, v(n+1) if versions exist)
 
 ### Module 3: Large Deal Summary for Dave
 
