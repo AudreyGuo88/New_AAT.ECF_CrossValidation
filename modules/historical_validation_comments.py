@@ -14,6 +14,7 @@ Workflow:
 import os
 import re
 import sys
+import shutil
 from pathlib import Path
 from typing import Optional, Tuple, Dict, List
 from datetime import datetime
@@ -291,6 +292,54 @@ def update_comments(target_file: str, comments_map: Dict[str, str], sheet_names:
     return updated_count
 
 
+def save_to_summary_report(source_file: str, date_str: str, summary_folder: str) -> None:
+    """
+    Save a versioned copy of the updated file to the AAT_ECF_SUMMARY_REPORT folder.
+
+    Checks existing files in the summary folder for the same date:
+    - If no files exist for this date -> saves as v1
+    - If last version is vN -> saves as v(N+1)
+
+    Args:
+        source_file: Path to the updated source file
+        date_str: Date string in format 'YYYYMMDD'
+        summary_folder: Target folder (config.AAT_ECF_SUMMARY_REPORT)
+    """
+    try:
+        os.makedirs(summary_folder, exist_ok=True)
+
+        # Scan existing files for this date to determine next version
+        try:
+            all_files = [f for f in os.listdir(summary_folder) if f.endswith('.xlsx') and not f.startswith('~$')]
+        except Exception as e:
+            print(f"  [Warning] Cannot read summary folder {summary_folder}: {e}")
+            return
+
+        pattern = rf'{date_str}\.v(\d+)'
+        max_version = 0
+        for filename in all_files:
+            match = re.search(pattern, filename)
+            if match:
+                version = int(match.group(1))
+                max_version = max(max_version, version)
+
+        next_version = max_version + 1
+
+        # Copy with versioned filename
+        versioned_filename = f'AAT vs ECF {date_str}.v{next_version}.xlsx'
+        versioned_path = os.path.join(summary_folder, versioned_filename)
+        shutil.copy2(source_file, versioned_path)
+
+        if max_version == 0:
+            print(f"  [OK] New month - saved as: {versioned_filename}")
+        else:
+            print(f"  [OK] Last version was v{max_version} - saved as: {versioned_filename}")
+        print(f"  [OK] Path: {versioned_path}")
+
+    except Exception as e:
+        print(f"  [Warning] Failed to save to summary report: {e}")
+
+
 def run_copy_comments(date_str: str) -> None:
     """
     Main function to copy comments from previous version.
@@ -305,7 +354,7 @@ def run_copy_comments(date_str: str) -> None:
     print(f"Source folder: {SOURCE_FOLDER}")
 
     # Step 1: Find latest version file for the date
-    print("\n[1/4] Finding latest version file...")
+    print("\n[1/5] Finding latest version file...")
     latest = find_latest_version(date_str, SOURCE_FOLDER)
 
     if not latest:
@@ -315,7 +364,7 @@ def run_copy_comments(date_str: str) -> None:
     print(f"  - Found: {os.path.basename(target_file)}")
 
     # Step 2: Find previous version
-    print("\n[2/4] Finding previous version...")
+    print("\n[2/5] Finding previous version...")
     prev_file = find_previous_version(date_str, current_version, SOURCE_FOLDER)
 
     if not prev_file:
@@ -328,7 +377,7 @@ def run_copy_comments(date_str: str) -> None:
     print(f"  - Found: {os.path.basename(prev_file)}")
 
     # Step 3: Extract comments from previous version
-    print("\n[3/4] Extracting comments from previous version...")
+    print("\n[3/5] Extracting comments from previous version...")
     comments_map = extract_comments_mapping(prev_file, TARGET_SHEETS)
 
     if not comments_map:
@@ -338,8 +387,18 @@ def run_copy_comments(date_str: str) -> None:
     print(f"  - Total unique comments: {len(comments_map)}")
 
     # Step 4: Update target file
-    print("\n[4/4] Updating target file...")
+    print("\n[4/5] Updating target file...")
     updated_count = update_comments(target_file, comments_map, TARGET_SHEETS)
+
+    if updated_count > 0:
+        print(f"  [OK] {updated_count} cells updated in: {os.path.basename(target_file)}")
+    else:
+        print("  [Warning] No cells were updated (all Deal Names may be new)")
+
+    # Step 5: Save to AAT_ECF_SUMMARY_REPORT with version numbering
+    print("\n[5/5] Saving to AAT ECF Summary Report...")
+    print(f"  - Target folder: {config.AAT_ECF_SUMMARY_REPORT}")
+    save_to_summary_report(target_file, date_str, config.AAT_ECF_SUMMARY_REPORT)
 
     print(f"\n{'=' * 80}")
     if updated_count > 0:

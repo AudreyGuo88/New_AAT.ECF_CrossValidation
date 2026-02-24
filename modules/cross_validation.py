@@ -482,6 +482,93 @@ def drop_cumulative_mv_column(wb: Workbook) -> None:
                     break
 
 
+def create_missing_aat_sheet(wb: Workbook, current_date: str) -> None:
+    """
+    Create a sheet listing all deals that are missing AAT IRR or Duration AAT values.
+
+    Args:
+        wb: Workbook to add the sheet to
+        current_date: Formatted current date string
+    """
+    ws_summary = wb['Summary']
+    aat_irr_col_name = f'{current_date} AAT IRR'
+    duration_aat_col_name = 'Duration AAT'
+
+    # Columns to display in the new sheet (plus a computed 'Missing Fields' column)
+    display_cols = [
+        'Deal Name',
+        'Sr. Portfolio Manager',
+        'AAT PM Owner',
+        aat_irr_col_name,
+        duration_aat_col_name,
+        'Liq Cap',
+        f'{current_date} MV',
+    ]
+
+    # Build index map from Summary header (0-based)
+    header = [cell.value for cell in ws_summary[1]]
+
+    aat_irr_idx = header.index(aat_irr_col_name) if aat_irr_col_name in header else None
+    duration_aat_idx = header.index(duration_aat_col_name) if duration_aat_col_name in header else None
+
+    if aat_irr_idx is None and duration_aat_idx is None:
+        print(f"  [Skip] Neither '{aat_irr_col_name}' nor '{duration_aat_col_name}' found in Summary")
+        return
+
+    col_idx_map = {col: header.index(col) for col in display_cols if col in header}
+    liq_cap_idx = header.index('Liq Cap') if 'Liq Cap' in header else None
+
+    # Collect rows where AAT IRR or Duration AAT is missing
+    missing_rows = []
+    liq_cap_values = []  # parallel list used for Deal Name highlighting
+    for row in ws_summary.iter_rows(min_row=2, max_row=ws_summary.max_row, values_only=True):
+        aat_irr_missing = aat_irr_idx is not None and row[aat_irr_idx] is None
+        duration_aat_missing = duration_aat_idx is not None and row[duration_aat_idx] is None
+
+        if aat_irr_missing or duration_aat_missing:
+            missing_fields = []
+            if aat_irr_missing:
+                missing_fields.append('AAT IRR')
+            if duration_aat_missing:
+                missing_fields.append('Duration AAT')
+
+            selected = [row[col_idx_map[col]] if col in col_idx_map else None for col in display_cols]
+            selected.append(', '.join(missing_fields))
+            missing_rows.append(selected)
+            liq_cap_values.append(row[liq_cap_idx] if liq_cap_idx is not None else None)
+
+    # Sort by Liq Cap descending (None treated as 0)
+    paired = sorted(zip(missing_rows, liq_cap_values), key=lambda x: x[1] or 0, reverse=True)
+    missing_rows, liq_cap_values = (list(col) for col in zip(*paired)) if paired else ([], [])
+
+    # Create sheet
+    ws_missing = wb.create_sheet(title='Missing AAT Data')
+    ws_missing.append(display_cols + ['Missing Fields'])
+    for row_data in missing_rows:
+        ws_missing.append(row_data)
+
+    # Apply standard formatting
+    format_all_sheets(ws_missing)
+
+    all_cols = display_cols + ['Missing Fields']
+    deal_name_display_col = all_cols.index('Deal Name') + 1          # 1-based
+    aat_irr_display_col = all_cols.index(aat_irr_col_name) + 1       # 1-based
+    duration_aat_display_col = all_cols.index(duration_aat_col_name) + 1  # 1-based
+
+    # Highlight missing cells in red; highlight Deal Name in gray for large deals (Liq Cap > 25mm)
+    HIGHLIGHT_RED = PatternFill(start_color='FF4C4C', end_color='FF4C4C', fill_type='solid')
+    for row_idx in range(2, ws_missing.max_row + 1):
+        liq_cap_val = liq_cap_values[row_idx - 2]
+        if liq_cap_val is not None and liq_cap_val > SIGNIFICANT_MV_THRESHOLD:
+            ws_missing.cell(row=row_idx, column=deal_name_display_col).fill = HIGHLIGHT_GRAY
+        if ws_missing.cell(row=row_idx, column=aat_irr_display_col).value is None:
+            ws_missing.cell(row=row_idx, column=aat_irr_display_col).fill = HIGHLIGHT_RED
+        if ws_missing.cell(row=row_idx, column=duration_aat_display_col).value is None:
+            ws_missing.cell(row=row_idx, column=duration_aat_display_col).fill = HIGHLIGHT_RED
+
+    print(f"  - 'Missing AAT Data': {len(missing_rows)} deals listed")
+
+
 def highlight_and_group_summary(ws: Worksheet, current_date: str) -> None:
     """
     Highlight significant deals and group/hide smaller ones.
@@ -558,6 +645,9 @@ def main(date_str: str) -> None:
         # Identify and create sheets for significant items
         sig_changes, sig_diffs, dur_diffs = identify_significant_changes(ws, current_date)
         create_highlighted_sheets(wb, sig_changes, sig_diffs, dur_diffs, current_date, last_date)
+
+        # Create missing AAT data sheet
+        create_missing_aat_sheet(wb, current_date)
 
         # Add categorization and final formatting
         add_category_column(wb, current_date)
